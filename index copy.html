@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Reflex - Pro</title>
+    <style>
+        body { margin: 0; background-color: #0a0a0c; color: #fff; font-family: sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        #game-container { position: relative; box-shadow: 0 0 20px rgba(0, 255, 255, 0.2); border: 2px solid #333; }
+        canvas { display: block; cursor: crosshair; }
+        #ui-layer { position: absolute; top: 20px; left: 20px; pointer-events: none; }
+        .score-text { font-size: 24px; font-weight: bold; color: #00ffff; text-shadow: 0 0 10px #00ffff; }
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+        button { padding: 10px 20px; font-size: 14px; background: transparent; color: #00ffff; border: 2px solid #00ffff; cursor: pointer; transition: 0.3s; text-transform: uppercase; }
+        button:hover { background: #00ffff; color: #000; box-shadow: 0 0 15px #00ffff; }
+        .btn-hard { color: #ff00ff; border-color: #ff00ff; }
+        .btn-hard:hover { background: #ff00ff; box-shadow: 0 0 15px #ff00ff; }
+
+        h1 { color: #00ffff; text-shadow: 0 0 15px #00ffff; margin-bottom: 5px; }
+        p { color: #888; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui-layer"><div class="score-text">Score: <span id="scoreVal">0</span></div></div>
+
+        <div id="overlay">
+            <h1 id="title">NEON REFLEX</h1>
+            <p id="msg">Choose your difficulty to begin</p>
+            <div class="btn-group">
+                <button onclick="startGame('easy')">Chill</button>
+                <button onclick="startGame('medium')">Normal</button>
+                <button class="btn-hard" onclick="startGame('hard')">Insane</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('scoreVal');
+        const overlay = document.getElementById('overlay');
+        const title = document.getElementById('title');
+        const msg = document.getElementById('msg');
+
+        canvas.width = 800;
+        canvas.height = 600;
+
+        let gameRunning = false;
+        let score = 0;
+        let player = { x: 400, y: 300, radius: 10, color: '#00ffff' };
+        let enemies = [];
+        let gems = [];
+        let frameCount = 0;
+        let difficultySettings = { spawnRate: 60, speedBoost: 1 };
+
+        const mouse = { x: 400, y: 300 };
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = e.clientX - rect.left;
+            mouse.y = e.clientY - rect.top;
+        });
+
+        class Enemy {
+            constructor(speedMult) {
+                this.radius = Math.random() * 12 + 8;
+                const edge = Math.floor(Math.random() * 4);
+                if (edge === 0) { this.x = -20; this.y = Math.random() * 600; }
+                else if (edge === 1) { this.x = 820; this.y = Math.random() * 600; }
+                else if (edge === 2) { this.x = Math.random() * 800; this.y = -20; }
+                else { this.x = Math.random() * 800; this.y = 620; }
+                
+                const angle = Math.atan2(mouse.y - this.y, mouse.x - this.x);
+                const speed = (Math.random() * 2 + 1) * speedMult;
+                this.dx = Math.cos(angle) * speed;
+                this.dy = Math.sin(angle) * speed;
+            }
+            update() { this.x += this.dx; this.y += this.dy; }
+            draw() {
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#ff3366'; ctx.fill(); ctx.closePath();
+            }
+        }
+
+        class Gem {
+            constructor() { this.x = Math.random() * 760 + 20; this.y = Math.random() * 560 + 20; }
+            draw() { ctx.fillStyle = '#00ffff'; ctx.fillRect(this.x, this.y, 10, 10); }
+        }
+
+        function startGame(mode) {
+            if (mode === 'easy') { difficultySettings = { spawnRate: 80, speedBoost: 0.8 }; }
+            else if (mode === 'medium') { difficultySettings = { spawnRate: 50, speedBoost: 1.3 }; }
+            else { difficultySettings = { spawnRate: 25, speedBoost: 2.2 }; }
+
+            score = 0; enemies = []; gems = [new Gem()];
+            scoreEl.innerText = score;
+            gameRunning = true;
+            overlay.style.display = 'none';
+            animate();
+        }
+
+        function animate() {
+            if (!gameRunning) return;
+            requestAnimationFrame(animate);
+            ctx.fillStyle = 'rgba(10, 10, 12, 0.4)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            frameCount++;
+
+            player.x += (mouse.x - player.x) * 0.15;
+            player.y += (mouse.y - player.y) * 0.15;
+            ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+            ctx.fillStyle = player.color; ctx.fill(); ctx.closePath();
+
+            gems.forEach((gem, i) => {
+                gem.draw();
+                if (Math.hypot(player.x - gem.x, player.y - gem.y) < 20) {
+                    gems.splice(i, 1); score += 50; scoreEl.innerText = score; gems.push(new Gem());
+                }
+            });
+
+            if (frameCount % difficultySettings.spawnRate === 0) enemies.push(new Enemy(difficultySettings.speedBoost));
+
+            enemies.forEach((enemy, i) => {
+                enemy.update(); enemy.draw();
+                if (Math.hypot(player.x - enemy.x, player.y - enemy.y) < player.radius + enemy.radius) {
+                    gameRunning = false;
+                    overlay.style.display = 'flex';
+                    title.innerText = "GAME OVER";
+                    msg.innerText = `Final Score: ${score}`;
+                }
+                if (enemy.x < -100 || enemy.x > 900 || enemy.y < -100 || enemy.y > 700) { enemies.splice(i, 1); score += 5; scoreEl.innerText = score; }
+            });
+        }
+    </script>
+</body>
+</html>
